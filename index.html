@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Смета на электромонтажные работы</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table {
+      border-collapse: collapse;
+      width: 600px;
+      max-width: 100%;
+      margin-top: 20px;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      width: 150px;
+      white-space: normal;
+    }
+    td {
+    width: 50px;
+    }
+    input[type="number"] {
+      width: 70px;
+    }
+    #total {
+      font-weight: bold;
+    }
+    button {
+      margin-top: 10px;
+      margin-right: 10px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <h1>Смета на электромонтажные работы</h1>
+
+  <button id="btnAdd" type="button">Добавить работы</button>
+  <button id="btnExport" type="button">Экспорт в Excel</button>
+
+  <table id="estimateTable">
+    <thead>
+      <tr>
+        <th>Работа</th>
+        <th>Количество</th>
+        <th>Ед. измер.</th>
+        <th>Цена (₽)</th>
+        <th>Сумма (₽)</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4"><strong>Общая сумма</strong></td>
+        <td id="total">0 ₽</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    // Массив работ с единицами измерения
+    const works = [
+      { name: 'Штробление стен под проводку', price: 600, unit: 'пог. м.' },
+      { name: 'Прокладка кабеля', price: 100, unit: 'пог. м.' },
+      { name: 'Заделка штроб', price: 50, unit: 'пог. м.' },
+      { name: 'Прокладка гофры', price: 80, unit: 'пог. м.' },
+      { name: 'Монтаж одноклавишного выключателя', price: 400, unit: 'шт' },
+      { name: 'Монтаж двухклавишного выключателя', price: 430, unit: 'шт' },
+      { name: 'Монтаж трехклавишного выключателя', price: 450, unit: 'шт' },
+      { name: 'Монтаж проходного выключателя', price: 500, unit: 'шт' },
+      { name: 'Демонтаж выключателя', price: 0, unit: 'шт' },
+      { name: 'Установка розеток', price: 400, unit: 'шт' },
+      { name: 'Установка розетки для электроплиты', price: 600, unit: 'шт' },
+      { name: 'Монтаж ТВ-розетки', price: 350, unit: 'шт' },
+      { name: 'Монтаж интернет-розетки', price: 400, unit: 'шт' },
+      { name: 'Демонтаж розетки', price: 0, unit: 'шт' },
+      { name: 'Монтаж распаячной коробки', price: 700, unit: 'шт' },
+      { name: 'Установка автоматов', price: 50, unit: 'шт' },
+      { name: 'Установка УЗО', price: 700, unit: 'шт' },
+    ];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const btnAdd = document.getElementById('btnAdd');
+      const btnExport = document.getElementById('btnExport');
+
+      btnAdd.addEventListener('click', addWorks);
+      btnExport.addEventListener('click', exportToExcel);
+
+      addWorks(); // сразу показываем таблицу
+    });
+
+    function addWorks() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      works.forEach(work => {
+        const row = document.createElement('tr');
+
+        const workCell = document.createElement('td');
+        workCell.textContent = work.name;
+
+        const qtyCell = document.createElement('td');
+        const qtyInput = document.createElement('input');
+        qtyInput.type = 'number';
+        qtyInput.min = 0;
+        qtyInput.step = '0.01';
+        qtyInput.value = '';
+        qtyInput.addEventListener('input', updateTotal);
+        qtyCell.appendChild(qtyInput);
+
+        const unitCell = document.createElement('td');
+        unitCell.textContent = work.unit; // выводим единицу измерения
+
+        const priceCell = document.createElement('td');
+        priceCell.textContent = work.price;
+
+        const sumCell = document.createElement('td');
+        sumCell.textContent = '0 ₽';
+
+        row.appendChild(workCell);
+        row.appendChild(qtyCell);
+        row.appendChild(unitCell);
+        row.appendChild(priceCell);
+        row.appendChild(sumCell);
+
+        tbody.appendChild(row);
+      });
+
+      updateTotal();
+    }
+
+    function updateTotal() {
+      let total = 0;
+      const tbody = document.getElementById('tableBody');
+      [...tbody.rows].forEach(row => {
+        const qtyInput = row.cells[1].firstChild;
+        const price = parseFloat(row.cells[3].textContent) || 0;
+        const sumCell = row.cells[4];
+
+        let qty = parseFloat(qtyInput.value);
+        if (isNaN(qty) || qty <= 0) qty = 0;
+
+        const sum = qty * price;
+        sumCell.textContent = sum.toFixed(2) + ' ₽';
+        total += sum;
+      });
+
+      document.getElementById('total').textContent = total.toFixed(2) + ' ₽';
+    }
+
+    function exportToExcel() {
+      if (typeof XLSX === 'undefined') {
+        alert('Библиотека XLSX не загружена.');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const data = [['Работа', 'Количество', 'Ед. измер.', 'Цена (₽)', 'Сумма (₽)']];
+      let total = 0;
+
+      document.querySelectorAll('#tableBody tr').forEach(row => {
+        const work = row.cells[0].textContent.trim();
+        const qtyInput = row.cells[1].querySelector('input');
+        const qty = parseFloat(qtyInput?.value || 0);
+        if (isNaN(qty) || qty <= 0) return;
+
+        const unit = row.cells[2].textContent;
+        const price = parseFloat(row.cells[3].textContent.trim()) || 0;
+        const sum = qty * price;
+        total += sum;
+
+        data.push([work, qty.toString(), unit, price.toString(), sum.toFixed(2) + ' ₽']);
+      });
+
+      data.push(['', '', '', 'Общая сумма', total.toFixed(2) + ' ₽']);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 15 }
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Смета');
+      XLSX.writeFile(wb, 'smeta.xlsx');
+    }
+  </script>
+</body>
+</html>
